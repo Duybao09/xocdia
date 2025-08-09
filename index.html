@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Game Xóc Đĩa — Player</title>
+
+<!-- Firebase compat -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+<style>
+  body{margin:0;font-family:Arial, Helvetica, sans-serif;background:#071025;color:#fff;display:flex;justify-content:center;align-items:center;min-height:100vh}
+  .card{width:100%;max-width:420px;background:linear-gradient(180deg,#0b1220,#0b2235);padding:18px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  h2{margin:6px 0 12px}
+  input,button,select{width:100%;padding:10px;border-radius:8px;border:0;margin:6px 0;font-size:15px}
+  .btn-primary{background:linear-gradient(90deg,#34d399,#10b981);color:#012018;font-weight:700;cursor:pointer}
+  .btn-alt{background:linear-gradient(90deg,#f59e0b,#fb923c);color:#07203a;font-weight:700;cursor:pointer}
+  .balance{color:#facc15;font-weight:800;margin:8px 0}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  .controls button{flex:1}
+  canvas{background:#062a3d;border-radius:12px;display:block;margin:8px auto}
+  .status{margin-top:8px;font-weight:700}
+  .small{font-size:13px;color:#9fb6d3}
+  @media(max-width:420px){.card{padding:12px}}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h2>Game Xóc Đĩa</h2>
+
+    <!-- REGISTER / LOGIN -->
+    <div id="authArea">
+      <div id="registerBox">
+        <div class="small">Đăng ký (chỉ username + mật khẩu). Khi đăng ký được +50,000 VNĐ.</div>
+        <input id="reg_user" placeholder="Tên đăng nhập">
+        <input id="reg_pass" type="password" placeholder="Mật khẩu">
+        <button id="btnRegister" class="btn-alt">Đăng ký</button>
+        <div class="small">Đã đăng ký? <a href="#" id="showLogin" style="color:#fff">Chuyển sang đăng nhập</a></div>
+      </div>
+
+      <div id="loginBox" style="display:none">
+        <div class="small">Đăng nhập</div>
+        <input id="login_user" placeholder="Tên đăng nhập">
+        <input id="login_pass" type="password" placeholder="Mật khẩu">
+        <button id="btnLogin" class="btn-primary">Đăng nhập</button>
+      </div>
+    </div>
+
+    <!-- GAME -->
+    <div id="gameArea" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="small">Người chơi:</div>
+          <div id="uname" style="font-weight:800"></div>
+        </div>
+        <div class="balance">Số dư: <span id="balance">0</span> VNĐ</div>
+      </div>
+
+      <canvas id="board" width="320" height="220"></canvas>
+
+      <input id="betInput" type="number" value="10000" min="100" />
+      <div style="margin-top:8px" class="controls">
+        <button data-bet="chan" class="btn-primary">Chẵn</button>
+        <button data-bet="le" class="btn-primary">Lẻ</button>
+      </div>
+
+      <div style="margin-top:8px" class="controls">
+        <button data-bet="4trang" class="btn-alt">4 Trắng</button>
+        <button data-bet="4do" class="btn-alt">4 Đỏ</button>
+      </div>
+
+      <div style="margin-top:8px" class="controls">
+        <button data-bet="3trang1do" class="btn-alt">3 Trắng 1 Đỏ</button>
+        <button data-bet="3do1trang" class="btn-alt">3 Đỏ 1 Trắng</button>
+      </div>
+
+      <div class="status" id="status">Chờ...</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button id="btnLogout" class="btn-alt">Đăng xuất</button>
+        <button id="btnRefresh" class="btn-primary">Lấy số dư</button>
+      </div>
+    </div>
+
+    <div class="small" style="margin-top:8px">PHIÊN BẢN FAKE, ADMIN CUTO ĐỤ NÁT LỒN EM❤️</div>
+  </div>
+
+<script>
+/* ========== Firebase config ========== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDIUSmn1Y4wpESA1L4Pyf8IuCt-vcoewhU",
+  authDomain: "duybaodz.firebaseapp.com",
+  databaseURL: "https://duybaodz-default-rtdb.asia-southeast1.firebasedatabase.app/",
+  projectId: "duybaodz",
+  storageBucket: "duybaodz.firebasestorage.app",
+  messagingSenderId: "667991135203",
+  appId: "1:667991135203:web:40e029b5acd7506c8bc6d6",
+  measurementId: "G-JKFHFTBCYJ"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+/* ========== UI refs ========== */
+const registerBox = document.getElementById('registerBox');
+const loginBox = document.getElementById('loginBox');
+const showLogin = document.getElementById('showLogin');
+const btnRegister = document.getElementById('btnRegister');
+const btnLogin = document.getElementById('btnLogin');
+const btnLogout = document.getElementById('btnLogout');
+const btnRefresh = document.getElementById('btnRefresh');
+const authArea = document.getElementById('authArea');
+const gameArea = document.getElementById('gameArea');
+const unameEl = document.getElementById('uname');
+const balanceEl = document.getElementById('balance');
+const statusEl = document.getElementById('status');
+const betInput = document.getElementById('betInput');
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+let currentUser = null;
+let currentBalance = 0;
+
+/* ========== hide register if browser already registered ========== */
+const REG_KEY = 'registered_user_name';
+if(localStorage.getItem(REG_KEY)){
+  registerBox.style.display = 'none';
+  loginBox.style.display = 'block';
+}
+
+/* ========== get client IP (ipify) ========= */
+async function getClientIP(){
+  try{
+    const resp = await fetch('https://api.ipify.org?format=json');
+    const j = await resp.json();
+    return j.ip || '';
+  }catch(e){
+    console.warn('ip fetch failed', e);
+    return '';
+  }
+}
+
+/* ========== register ========== */
+btnRegister.addEventListener('click', async ()=>{
+  const user = (document.getElementById('reg_user').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  const pass = (document.getElementById('reg_pass').value || '');
+  if(!user || !pass){ alert('Nhập tên & mật khẩu'); return; }
+  const ref = db.ref('users/' + user);
+  const snap = await ref.get();
+  if(snap.exists()){ alert('Tên đã tồn tại'); return; }
+  const ip = await getClientIP();
+  const now = new Date().toISOString();
+  await ref.set({ password: pass, balance: 50000, ip: ip, registeredAt: now, lastLogin: now });
+  localStorage.setItem(REG_KEY, user); // hide register next time
+  alert('Đăng ký thành công! Bạn đã nhận 50,000 VNĐ. Vui lòng đăng nhập.');
+  document.getElementById('login_user').value = user;
+  document.getElementById('login_pass').value = pass;
+  registerBox.style.display = 'none';
+  loginBox.style.display = 'block';
+});
+
+/* ========== login ========== */
+btnLogin.addEventListener('click', async ()=>{
+  const user = (document.getElementById('login_user').value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g,'');
+  const pass = (document.getElementById('login_pass').value || '');
+  if(!user || !pass){ alert('Nhập tên & mật khẩu'); return; }
+  const ref = db.ref('users/' + user);
+  const snap = await ref.get();
+  if(!snap.exists()){ alert('Tài khoản không tồn tại'); return; }
+  const data = snap.val();
+  if(data.password !== pass){ alert('Sai mật khẩu'); return; }
+  // success
+  currentUser = user;
+  currentBalance = data.balance || 0;
+  unameEl.textContent = user;
+  balanceEl.textContent = format(currentBalance);
+  authArea.style.display = 'none';
+  gameArea.style.display = 'block';
+  // update lastLogin and ip
+  const ip = await getClientIP();
+  await ref.update({ lastLogin: new Date().toISOString(), ip: ip });
+  // listen to balance changes
+  db.ref('users/' + currentUser + '/balance').on('value', s=>{
+    const v = s.val() || 0;
+    currentBalance = v;
+    balanceEl.textContent = format(v);
+  });
+});
+
+/* ========== logout ========== */
+btnLogout.addEventListener('click', ()=>{
+  if(currentUser) db.ref('users/' + currentUser + '/balance').off();
+  currentUser = null;
+  authArea.style.display = 'block';
+  gameArea.style.display = 'none';
+});
+
+/* ========== simple draw and animation for 4 coins (red/white) ========== */
+function drawCoins(whitesCount, positions=null){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const cx = canvas.width/2, cy = canvas.height/2;
+  const base = [
+    {x:cx-70,y:cy-30},
+    {x:cx+70,y:cy-30},
+    {x:cx-40,y:cy+60},
+    {x:cx+40,y:cy+60}
+  ];
+  for(let i=0;i<4;i++){
+    const p = positions ? positions[i] : base[i];
+    const isWhite = i < whitesCount;
+    ctx.beginPath();
+    ctx.fillStyle = isWhite ? '#ffffff' : '#e74c3c';
+    ctx.arc(p.x,p.y,26,0,Math.PI*2);
+    ctx.fill();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#07323a'; ctx.stroke();
+    ctx.fillStyle = isWhite ? '#07323a' : '#fff5f5';
+    ctx.font = 'bold 14px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText(isWhite ? 'W' : 'R', p.x, p.y);
+  }
+}
+
+/* animate shake, return whitesCount */
+function animateShakeWeighted(){
+  return new Promise(resolve=>{
+    const start = performance.now();
+    const duration = 1000;
+    // weighted distribution to favor chẵn (even whites count)
+    const weighted = [0,0,0,0,0,0,0,0, 1,1, 2,2,2,2,2,2,2,2,2,2,2,2, 3,3, 4,4,4,4,4,4,4,4];
+    const finalWhites = weighted[Math.floor(Math.random()*weighted.length)];
+    function frame(t){
+      const p = Math.min(1,(t-start)/duration);
+      const amp = (1-p)*20;
+      const base = [
+        {x:canvas.width/2-70,y:canvas.height/2-30},
+        {x:canvas.width/2+70,y:canvas.height/2-30},
+        {x:canvas.width/2-40,y:canvas.height/2+60},
+        {x:canvas.width/2+40,y:canvas.height/2+60}
+      ];
+      const positions = base.map(pos=>({x:pos.x + (Math.random()*2-1)*amp, y:pos.y + (Math.random()*2-1)*amp}));
+      const showWhites = (p < 0.85) ? Math.floor(Math.random()*5) : finalWhites;
+      drawCoins(showWhites, positions);
+      if(p < 1) requestAnimationFrame(frame);
+      else resolve(finalWhites);
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+/* bet button handling (delegation) */
+document.querySelectorAll('[data-bet]').forEach(btn=>{
+  btn.addEventListener('click', ()=> startRound(btn.dataset.bet));
+});
+
+async function startRound(choice){
+  if(!currentUser){ alert('Vui lòng đăng nhập'); return; }
+  const bet = parseInt(betInput.value) || 0;
+  if(bet <= 0){ alert('Nhập số tiền cược hợp lệ'); return; }
+  // get current balance snapshot
+  const snap = await db.ref('users/' + currentUser).get();
+  const cur = (snap.exists() && snap.val().balance) ? snap.val().balance : 0;
+  if(bet > cur){ alert('Không đủ tiền'); return; }
+  // deduct immediately
+  await db.ref('users/' + currentUser + '/balance').set(cur - bet);
+  statusEl.textContent = 'Đang lắc...';
+  const whites = await animateShakeWeighted(); // 0..4 whites
+  const reds = 4 - whites;
+  const parity = (whites % 2 === 0) ? 'chan' : 'le';
+  let win = false, multiplier = 1;
+  // determine wins
+  if(choice === 'chan' && parity === 'chan'){ win = true; multiplier = 2; } // regular chẵn pays 2x
+  if(choice === 'le' && parity === 'le'){ win = true; multiplier = 2; }
+  if(choice === '4trang' && whites === 4){ win = true; multiplier = 2; } // special x2
+  if(choice === '4do' && whites === 0){ win = true; multiplier = 2; }
+  if(choice === '3trang1do' && whites === 3){ win = true; multiplier = 2; }
+  if(choice === '3do1trang' && whites === 1){ win = true; multiplier = 2; }
+
+  if(win){
+    const winAmount = bet * multiplier;
+    const snap2 = await db.ref('users/' + currentUser).get();
+    const newBal = (snap2.exists()? snap2.val().balance : 0) + winAmount;
+    await db.ref('users/' + currentUser + '/balance').set(newBal);
+    statusEl.textContent = `Kết quả: ${whites} trắng / ${reds} đỏ — Thắng +${winAmount.toLocaleString()} VNĐ ${multiplier>1?'(X2 cho cửa đặc biệt)':''}`;
+    // log
+    db.ref('logs').push({ admin: 'system', user: currentUser, action: 'win', amount: winAmount, detail: `${whites} trắng`, time: new Date().toISOString() });
+  } else {
+    statusEl.textContent = `Kết quả: ${whites} trắng / ${reds} đỏ — Thua -${bet.toLocaleString()} VNĐ`;
+    db.ref('logs').push({ admin: 'system', user: currentUser, action: 'lose', amount: bet, detail: `${whites} trắng`, time: new Date().toISOString() });
+  }
+}
+
+/* refresh balance */
+btnRefresh.addEventListener('click', async ()=>{
+  if(!currentUser) return;
+  const snap = await db.ref('users/' + currentUser + '/balance').get();
+  balanceEl.textContent = format(snap.exists() ? snap.val() : 0);
+});
+
+/* utility */
+function format(n){ return (n||0).toLocaleString('en-US'); }
+
+/* initialize canvas */
+drawCoins(0);
+</script>
+</body>
+</html>
