@@ -2,15 +2,64 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Nhận mã xác nhận</title>
+  <title>Mã Xác Nhận</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      text-align: center;
+    }
+    .code-box {
+      font-family: Arial, sans-serif;
+      background: #fff;
+      border-radius: 8px;
+      padding: 20px;
+      max-width: 400px;
+      margin: 100px auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    .code-text {
+      font-size: 28px;
+      font-weight: bold;
+      color: #d6336c;
+      margin-top: 20px;
+    }
+  </style>
 </head>
-<body style="font-family: Arial; text-align:center; padding:50px;">
-  <h2>🎁 Đây là mã xác nhận của bạn</h2>
-  <h1 id="code" style="color:blue;"></h1>
-  <p>👉 Hãy copy mã này và nhập vào bot bằng lệnh <b>/nhapma &lt;mã&gt;</b></p>
+<body>
+
+  <div id="container"></div>
+
   <script>
+    function generateRandomCode(length = 8) {
+      const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+      let result = "";
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      return result;
+    }
+
+    // Lấy param code từ URL (?code=ABC123)
     const urlParams = new URLSearchParams(window.location.search);
-    document.getElementById("code").innerText = urlParams.get("code") || "Không có mã";
+    let code = urlParams.get('code');
+
+    if (!code) {
+      // Nếu không có code trên URL → tự tạo random
+      code = generateRandomCode();
+    }
+
+    // Hiển thị code ra giao diện
+    document.getElementById("container").innerHTML = `
+      <div class="code-box">
+        <h2>🎉 Mã Xác Nhận Của Bạn</h2>
+        <p>Sao chép mã bên dưới và quay lại bot Telegram nhập:</p>
+        <div class="code-text">${code}</div>
+        <p>👉 Sử dụng lệnh <b>/nhapma &lt;mã&gt;</b> để nhận key.</p>
+      </div>
+    `;
   </script>
+
 </body>
 </html>
